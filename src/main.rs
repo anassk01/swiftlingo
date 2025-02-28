@@ -862,9 +862,9 @@ fn main() {
     // Create and run the application first
     let app = Application::builder()
         .application_id(APP_ID)
-        .flags(gio::ApplicationFlags::ALLOW_REPLACEMENT | gio::ApplicationFlags::REPLACE | gio::ApplicationFlags::NON_UNIQUE)
+        .flags(gio::ApplicationFlags::ALLOW_REPLACEMENT | gio::ApplicationFlags::REPLACE)
         .build();
-    
+
     // Create a Tokio runtime for async tasks.
     let rt = Runtime::new().expect("Unable to create Runtime");
     let _enter = rt.enter();
@@ -879,7 +879,14 @@ fn main() {
     });
     
     app.connect_activate(move |app| {
-        build_ui(app);
+        // Get existing windows
+        if let Some(window) = app.active_window() {
+            // Focus existing window instead of creating a new one
+            window.present_with_time(gtk::gdk::CURRENT_TIME);
+        } else {
+            // Only build UI if no existing window
+            build_ui(app);
+        }
     });
     
     app.run();

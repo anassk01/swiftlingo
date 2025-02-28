@@ -8,6 +8,10 @@ use std::time::Duration;
 use x11::xlib;
 use std::ptr;
 use std::mem;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+// For tracking hotkey timing to prevent duplicate triggers
+static LAST_TRIGGER: AtomicU64 = AtomicU64::new(0);
 
 // The exact window title to search for when focusing
 const WINDOW_TITLE: &str = "SwiftLingo";
@@ -61,10 +65,26 @@ pub fn start_global_hotkey_service() {
                 if Path::new(&trigger_path).exists() {
                     // The file exists - this means our shortcut was triggered
                     println!("Hotkey trigger detected!");
+                    
+                    // Check if we're triggering too frequently to prevent duplicate launches
+                    let now = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_millis() as u64;
+                    
+                    let last = LAST_TRIGGER.load(Ordering::Relaxed);
+                    if now - last < 1000 {  // Prevent triggers within 1 second
+                        // Remove the trigger file to reset for next time
+                        std::fs::remove_file(&trigger_path).unwrap_or_else(|_| {});
+                        println!("Ignoring rapid repeated hotkey trigger");
+                        continue;
+                    }
+                    LAST_TRIGGER.store(now, Ordering::Relaxed);
+                    
                     // Remove the trigger file to reset for next time
                     std::fs::remove_file(&trigger_path).unwrap_or_else(|_| {});
 
-                    // Focus the window FIRST, before doing anything else
+                    // Focus the window ONLY ONCE
                     focus_translator_window();
                     
                     // Get the selected text
@@ -75,10 +95,6 @@ pub fn start_global_hotkey_service() {
                         if let Ok(mut file) = File::create(&selection_path) {
                             let _ = file.write_all(selection.as_bytes());
                             println!("Selection saved to: {}", selection_path);
-                            
-                            // Focus one more time after everything is done
-                            thread::sleep(Duration::from_millis(50));
-                            focus_translator_window();
                         }
                     }
                 }
@@ -89,6 +105,28 @@ pub fn start_global_hotkey_service() {
 
 /// Try multiple methods to focus the translator window
 fn focus_translator_window() {
+    // First check if window exists to avoid launching new instances
+    let window_exists = Command::new("xdotool")
+        .args(["search", "--name", "^SwiftLingo$"])
+        .output()
+        .map(|output| !output.stdout.is_empty())
+        .unwrap_or(false);
+
+    // If window doesn't exist, just create the focus trigger file and return
+    if !window_exists {
+        // Create a trigger file that the main app will monitor
+        let home_dir = env::var("HOME").unwrap_or_else(|_| ".".to_string());
+        let trigger_dir = format!("{}/.config/translator-app", home_dir);
+        std::fs::create_dir_all(&trigger_dir).unwrap_or_else(|_| {});
+        
+        let focus_path = format!("{}/focus-window", trigger_dir);
+        if let Ok(file) = std::fs::File::create(&focus_path) {
+            drop(file); // Just create the file as a trigger
+            println!("Created focus trigger file - no existing window found");
+        }
+        return;
+    }
+
     // Check if we're running on Wayland
     let is_wayland = env::var("XDG_SESSION_TYPE")
         .map(|s| s.to_lowercase() == "wayland")
@@ -144,7 +182,7 @@ fn focus_translator_window() {
         }
     }
     
-    // Fallback methods if window ID approach failed
+    // Fallback methods if window ID approach failed - only try these if we confirmed window exists earlier
     let methods = vec![
         // Method 1: Use wmctrl to force window above others
         Command::new("wmctrl")
@@ -155,26 +193,12 @@ fn focus_translator_window() {
         Command::new("wmctrl")
             .args(["-F", "-a", WINDOW_TITLE, "-b", "remove,hidden,shaded", "-b", "add,above,sticky"])
             .spawn(),
-            
-        // Method 3: Try by window class
-        Command::new("xdotool")
-            .args(["search", "--class", "translator-app", "windowactivate", "--sync", "windowraise", "windowfocus"])
-            .spawn()
     ];
     
     // Wait for all methods to complete
     for mut child in methods.into_iter().filter_map(Result::ok) {
         let _ = child.wait();
     }
-    
-    // Final attempt with both tools
-    let _ = Command::new("wmctrl")
-        .args(["-F", "-a", WINDOW_TITLE, "-b", "remove,hidden,shaded", "-b", "add,above,sticky"])
-        .status();
-        
-    let _ = Command::new("xdotool")
-        .args(["search", "--name", WINDOW_TITLE, "windowactivate", "--sync", "windowraise", "windowfocus"])
-        .status();
 }
 
 /// Check if we're running under GNOME
@@ -200,9 +224,6 @@ fn setup_gnome_shortcut(trigger_path: &str) {
     if let Ok(mut file) = File::create(&script_path) {
         writeln!(file, "#!/bin/sh").unwrap();
         writeln!(file, "touch {}", trigger_path).unwrap();
-        writeln!(file, "# Focus the window after a small delay").unwrap();
-        writeln!(file, "(sleep 0.5 && wmctrl -a \"{}\" || xdotool search --name \"{}\" windowactivate) &", 
-                WINDOW_TITLE, WINDOW_TITLE).unwrap();
     }
     
     let _ = Command::new("chmod")
@@ -248,9 +269,6 @@ fn setup_kde_shortcut(trigger_path: &str) {
     if let Ok(mut file) = File::create(&script_path) {
         writeln!(file, "#!/bin/sh").unwrap();
         writeln!(file, "touch {}", trigger_path).unwrap();
-        writeln!(file, "# Focus the window after a small delay").unwrap();
-        writeln!(file, "(sleep 0.5 && wmctrl -a \"{}\" || xdotool search --name \"{}\" windowactivate) &", 
-                WINDOW_TITLE, WINDOW_TITLE).unwrap();
     }
     
     let _ = Command::new("chmod")
@@ -282,9 +300,6 @@ fn setup_generic_shortcut(trigger_path: &str) {
     if let Ok(mut file) = File::create(&script_path) {
         writeln!(file, "#!/bin/sh").unwrap();
         writeln!(file, "touch {}", trigger_path).unwrap();
-        writeln!(file, "# Focus the window after a small delay").unwrap();
-        writeln!(file, "(sleep 0.5 && wmctrl -a \"{}\" || xdotool search --name \"{}\" windowactivate) &", 
-                WINDOW_TITLE, WINDOW_TITLE).unwrap();
     }
     
     let _ = Command::new("chmod")
@@ -368,6 +383,19 @@ fn monitor_x11_hotkey(trigger_path: &str) {
                    (state == (ctrl_mask | alt_mask)) {
                     println!("X11 Hotkey Ctrl+Alt+T detected!");
                     
+                    // Check for rapid repeated triggers
+                    let now = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_millis() as u64;
+                    
+                    let last = LAST_TRIGGER.load(Ordering::Relaxed);
+                    if now - last < 1000 {  // Prevent triggers within 1 second
+                        println!("Ignoring rapid repeated hotkey trigger");
+                        continue;
+                    }
+                    LAST_TRIGGER.store(now, Ordering::Relaxed);
+                    
                     // Create trigger file
                     if let Ok(file) = File::create(trigger_path) {
                         drop(file);
@@ -383,11 +411,7 @@ fn monitor_x11_hotkey(trigger_path: &str) {
                             let _ = file.write_all(selection.as_bytes());
                         }
                         
-                        // Focus the window immediately and aggressively
-                        focus_translator_window();
-                        
-                        // Add a small delay and try again to ensure focus
-                        thread::sleep(Duration::from_millis(100));
+                        // Focus the window - only call ONCE
                         focus_translator_window();
                     }
                 }
