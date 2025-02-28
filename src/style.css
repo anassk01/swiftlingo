@@ -1,0 +1,325 @@
+/* General styling */
+window {
+    background-color: #f9f9f9;
+}
+
+.info-label {
+    font-size: 14px;
+    color: #555;
+    font-style: italic;
+}
+
+frame {
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    margin: 5px;
+}
+
+frame > label {
+    font-weight: bold;
+    font-size: 14px;
+    color: #333;
+}
+
+/* Language selectors */
+.language-selector {
+    min-width: 180px;
+}
+
+/* Text areas */
+.text-area {
+    font-size: 15px;
+    padding: 8px;
+    border-radius: 4px;
+    background-color: #ffffff;
+}
+
+.output-area {
+    background-color: #f3f8ff;
+}
+
+/* Improved Button styling */
+button {
+    padding: 6px 12px;
+    border-radius: 4px;
+    border: none;
+    transition: background-color 0.2s;
+}
+
+button:hover {
+    background-color: #e0e0e0;
+}
+
+button.suggested-action {
+    background-color: #4e9af1;
+    color: white;
+    border: none;
+    font-weight: bold;
+}
+
+button.suggested-action:hover {
+    background-color: #5aa4f2;
+}
+
+button.destructive-action {
+    background-color: #e95645;
+    color: white;
+    border: none;
+    font-weight: bold;
+}
+
+button.destructive-action:hover {
+    background-color: #f06854;
+}
+
+/* Status bar */
+statusbar {
+    font-size: 12px;
+    color: #666;
+    padding: 4px;
+    margin-top: 5px;
+}
+
+/* Scrollbars */
+scrollbar {
+    background-color: transparent;
+    border-radius: 10px;
+}
+
+scrollbar slider {
+    min-width: 10px;
+    border-radius: 10px;
+    background-color: #c0c0c0;
+}
+
+scrollbar slider:hover {
+    background-color: #a0a0a0;
+}
+
+/* Dark mode support */
+.dark-mode window,
+.dark-mode dialog,
+.dark-mode popover,
+.dark-mode menu {
+    background-color: #121212;
+    color: #ffffff;
+}
+
+.dark-mode headerbar {
+    background-color: #1a1a1a;
+    border-bottom: 1px solid #2d2d2d;
+}
+
+.dark-mode .info-label {
+    color: #e0e0e0;
+}
+
+.dark-mode frame {
+    background-color: #1a1a1a;
+    border: 1px solid #2d2d2d;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.dark-mode frame > label {
+    color: #ffffff;
+    background-color: transparent;
+}
+
+.dark-mode label {
+    color: #ffffff;
+    background-color: transparent;
+}
+
+.dark-mode .text-area {
+    background-color: #1a1a1a;
+    color: #ffffff;
+    border: 1px solid #2d2d2d;
+}
+
+.dark-mode .output-area {
+    background-color: #1a1a1a;
+}
+
+.dark-mode textview {
+    background-color: #1a1a1a;
+    color: #ffffff;
+}
+
+.dark-mode textview text {
+    background-color: #1a1a1a;
+    color: #ffffff;
+}
+
+.dark-mode button {
+    background-color: #1a1a1a;
+    color: #ffffff;
+    border: 1px solid #2d2d2d;
+    transition: all 0.2s ease;
+    font-weight: 500;
+}
+
+.dark-mode button:hover {
+    background-color: #2d2d2d;
+    border-color: #3d3d3d;
+}
+
+.dark-mode button:active {
+    background-color: #161616;
+}
+
+.dark-mode button.suggested-action {
+    background-color: #1a4b8c;
+    color: #ffffff;
+    border: none;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    font-weight: bold;
+}
+
+.dark-mode button.suggested-action:hover {
+    background-color: #2563b3;
+}
+
+.dark-mode button.suggested-action:active {
+    background-color: #153e75;
+}
+
+.dark-mode button.destructive-action {
+    background-color: #991b1b;
+    color: #ffffff;
+    border: none;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    font-weight: bold;
+}
+
+.dark-mode button.destructive-action:hover {
+    background-color: #b91c1c;
+}
+
+.dark-mode button.destructive-action:active {
+    background-color: #7f1d1d;
+}
+
+.dark-mode statusbar {
+    color: #e0e0e0;
+    background-color: #121212;
+    border-top: 1px solid #2d2d2d;
+}
+
+/* Fix for popover menus */
+popover {
+    padding: 10px;
+}
+
+popover box {
+    padding: 5px;
+}
+
+/* Fix for combo boxes */
+combobox button {
+    padding: 5px 10px;
+}
+
+/* Fix for entry fields */
+entry {
+    padding: 5px 8px;
+    min-height: 20px;
+}
+
+.dark-mode entry {
+    background-color: #1a1a1a;
+    color: #ffffff;
+    border: 1px solid #2d2d2d;
+}
+
+.dark-mode entry:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.dark-mode popover {
+    background-color: #1a1a1a;
+    color: #ffffff;
+    border: 1px solid #2d2d2d;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.4);
+}
+
+.dark-mode popover contents {
+    background-color: #1a1a1a;
+    color: #ffffff;
+}
+
+.dark-mode combobox button {
+    background-color: #1a1a1a;
+    color: #ffffff;
+    border: 1px solid #2d2d2d;
+}
+
+.dark-mode combobox button:hover {
+    background-color: #2d2d2d;
+    border-color: #3d3d3d;
+}
+
+.dark-mode combobox button:active {
+    background-color: #161616;
+}
+
+.dark-mode combobox window.popup {
+    background-color: #1a1a1a;
+    border: 1px solid #2d2d2d;
+}
+
+.dark-mode combobox window.popup list {
+    background-color: #1a1a1a;
+    color: #ffffff;
+}
+
+.dark-mode combobox window.popup list row {
+    background-color: #1a1a1a;
+    color: #ffffff;
+}
+
+.dark-mode combobox window.popup list row:hover {
+    background-color: #2d2d2d;
+}
+
+.dark-mode combobox window.popup list row:selected {
+    background-color: #2563b3;
+}
+
+.dark-mode scrollbar {
+    background-color: #121212;
+}
+
+.dark-mode scrollbar slider {
+    background-color: #2d2d2d;
+    border-radius: 10px;
+    min-width: 8px;
+}
+
+.dark-mode scrollbar slider:hover {
+    background-color: #3d3d3d;
+}
+
+.dark-mode scrollbar slider:active {
+    background-color: #4d4d4d;
+}
+
+.dark-mode notebook > header {
+    background-color: #1a1a1a;
+    border-bottom: 1px solid #2d2d2d;
+}
+
+.dark-mode notebook > header > tabs > tab {
+    background-color: #1a1a1a;
+    color: #e0e0e0;
+    border: 1px solid #2d2d2d;
+}
+
+.dark-mode notebook > header > tabs > tab:checked {
+    background-color: #2d2d2d;
+    color: #ffffff;
+}
+
+.dark-mode notebook > header > tabs > tab:hover:not(:checked) {
+    background-color: #252525;
+}
