@@ -233,7 +233,7 @@ fn build_ui(app: &Application) {
         let about_dialog = gtk::AboutDialog::new();
         about_dialog.set_transient_for(Some(&window_clone));
         about_dialog.set_modal(true);
-        about_dialog.set_program_name(Some("Instant Translator"));
+        about_dialog.set_program_name(Some("SwiftLingo"));
         about_dialog.set_version(Some(env!("CARGO_PKG_VERSION")));
         about_dialog.set_comments(Some("A fast and convenient translator app"));
         about_dialog.set_authors(&["Anassk"]);

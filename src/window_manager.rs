@@ -14,7 +14,7 @@ use std::time::Duration;
 use std::sync::Arc;
 
 // The window title to match
-const WINDOW_TITLE: &str = "Instant Translator";
+const WINDOW_TITLE: &str = "SwiftLingo";
 
 type Window32 = u32;
 

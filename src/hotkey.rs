@@ -10,7 +10,7 @@ use std::ptr;
 use std::mem;
 
 // The exact window title to search for when focusing
-const WINDOW_TITLE: &str = "Instant Translator";
+const WINDOW_TITLE: &str = "SwiftLingo";
 
 /// Start a background thread that monitors for global hotkey presses (Ctrl+Alt+T)
 /// When detected, it writes a trigger file that the main app can watch for
@@ -113,7 +113,7 @@ fn focus_translator_window() {
     // X11-specific methods - only run these on X11
     // First try to get window ID
     if let Ok(output) = Command::new("xdotool")
-        .args(["search", "--name", "^Instant Translator$"])
+        .args(["search", "--name", "^SwiftLingo$"])
         .output()
     {
         if let Ok(window_id) = String::from_utf8(output.stdout) {
