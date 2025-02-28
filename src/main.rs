@@ -174,11 +174,15 @@ fn build_ui(app: &Application) {
         .default_width(settings.window_width)
         .default_height(settings.window_height)
         .build();
+        
+    // Set up window properties for better desktop integration
+    window_manager.setup_window(&window);
+    
+    // Set application ID for better window manager integration
+    app.set_application_id(Some(APP_ID));
     
     // Set window position if it was saved
     if let (Some(_x), Some(_y)) = (settings.window_x, settings.window_y) {
-        // Note: GTK4 doesn't provide a reliable way to get or set absolute window position
-        // We can only set the window size
         window.set_default_size(settings.window_width, settings.window_height);
     }
     
@@ -693,15 +697,14 @@ fn build_ui(app: &Application) {
             return;
         }
         
-        // Create a clipboard
-        let clipboard = gtk::gdk::Display::default().unwrap().clipboard();
-        
-        // Set the clipboard text
-        clipboard.set_text(&text);
-        
-        status_bar.push(0, "Translation copied to clipboard");
+        // Use our native clipboard implementation
+        if selection::set_clipboard_text(&text) {
+            status_bar.push(0, "Translation copied to clipboard");
+        } else {
+            status_bar.push(0, "Failed to copy to clipboard");
+        }
     });
-    
+
     // Set up monitoring for the global hotkey trigger file
     let home_dir = env::var("HOME").unwrap_or_else(|_| ".".to_string());
     let selection_path = format!("{}/.config/translator-app/selection.txt", home_dir);
@@ -723,9 +726,6 @@ fn build_ui(app: &Application) {
                 if mod_time > last_focus_time {
                     last_focus_time = mod_time;
                     
-                    // The focus file exists - bring window to front
-                    println!("Focus request detected!");
-                    
                     // Remove the focus file
                     let _ = fs::remove_file(&focus_path);
                     
@@ -741,16 +741,13 @@ fn build_ui(app: &Application) {
                 if mod_time > last_mod_time {
                     last_mod_time = mod_time;
                     
-                    // The file was modified, which means our global hotkey was triggered
                     // Read the selection from the file
                     if let Ok(selection) = fs::read_to_string(&selection_path) {
                         if !selection.is_empty() {
-                            println!("Global hotkey triggered! Got text: {}", selection);
-                            
                             // Set the input text
                             app_state_clone.borrow().input_buffer.set_text(&selection);
                             
-                            // IMPORTANT: Make sure window comes to front with focus
+                            // Make sure window comes to front with focus
                             app_state_clone.borrow().window_manager.focus_window(&window_clone);
                             
                             // Trigger translation
@@ -854,17 +851,18 @@ fn get_css_path() -> Option<String> {
 }
 
 fn main() {
-    // Create the window manager to check for clipboard tools
+    // Create the window manager to check for window management tools
     let window_manager = WindowManager::new();
-    let has_clipboard_tools = window_manager.check_clipboard_tools();
+    let has_window_tools = window_manager.check_clipboard_tools();
     
-    if !has_clipboard_tools {
-        eprintln!("Warning: Missing clipboard tools. Please install xclip and wl-clipboard packages.");
+    if !has_window_tools {
+        eprintln!("Warning: Missing window management tools. Some window focusing features may not work properly.");
     }
     
     // Create and run the application first
     let app = Application::builder()
         .application_id(APP_ID)
+        .flags(gio::ApplicationFlags::ALLOW_REPLACEMENT | gio::ApplicationFlags::REPLACE | gio::ApplicationFlags::NON_UNIQUE)
         .build();
     
     // Create a Tokio runtime for async tasks.

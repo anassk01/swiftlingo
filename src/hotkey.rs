@@ -2,7 +2,7 @@ use std::env;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::Command;
 use std::thread;
 use std::time::Duration;
 use x11::xlib;
@@ -63,6 +63,10 @@ pub fn start_global_hotkey_service() {
                     println!("Hotkey trigger detected!");
                     // Remove the trigger file to reset for next time
                     std::fs::remove_file(&trigger_path).unwrap_or_else(|_| {});
+
+                    // Focus the window FIRST, before doing anything else
+                    focus_translator_window();
+                    
                     // Get the selected text
                     let selection = get_current_selection();
                     if !selection.is_empty() {
@@ -72,13 +76,8 @@ pub fn start_global_hotkey_service() {
                             let _ = file.write_all(selection.as_bytes());
                             println!("Selection saved to: {}", selection_path);
                             
-                            // Create a file to signal the app should come to the foreground
-                            let focus_path = format!("{}/focus-window", trigger_dir);
-                            if let Ok(file) = File::create(&focus_path) {
-                                drop(file);
-                            }
-                            
-                            // Try to directly activate the application window
+                            // Focus one more time after everything is done
+                            thread::sleep(Duration::from_millis(50));
                             focus_translator_window();
                         }
                     }
@@ -90,40 +89,91 @@ pub fn start_global_hotkey_service() {
 
 /// Try multiple methods to focus the translator window
 fn focus_translator_window() {
-    // Method 1: Use wmctrl with exact title match
-    let _ = Command::new("wmctrl")
-        .args(["-a", WINDOW_TITLE])
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status();
+    // Check if we're running on Wayland
+    let is_wayland = env::var("XDG_SESSION_TYPE")
+        .map(|s| s.to_lowercase() == "wayland")
+        .unwrap_or(false) 
+        || env::var("WAYLAND_DISPLAY").is_ok();
     
-    // Method 2: Use xdotool with exact title match
-    let _ = Command::new("xdotool")
-        .args(["search", "--name", "^Instant Translator$", "windowactivate"])
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status();
-    
-    // Method 3: Create a temporary focusing script
-    let home_dir = env::var("HOME").unwrap_or_else(|_| ".".to_string());
-    let script_path = format!("{}/.config/translator-app/focus.sh", home_dir);
-    
-    if let Ok(mut file) = File::create(&script_path) {
-        writeln!(file, "#!/bin/sh").unwrap();
-        writeln!(file, "wmctrl -a \"{}\" || true", WINDOW_TITLE).unwrap();
-        writeln!(file, "xdotool search --name \"{}\" windowactivate || true", WINDOW_TITLE).unwrap();
-        writeln!(file, "# Try to focus using window class").unwrap();
-        writeln!(file, "xdotool search --class \"translator-app\" windowactivate || true").unwrap();
+    if is_wayland {
+        // On Wayland, we can't directly focus windows from outside the app
+        // Create a trigger file that the main app will monitor
+        let home_dir = env::var("HOME").unwrap_or_else(|_| ".".to_string());
+        let trigger_dir = format!("{}/.config/translator-app", home_dir);
+        std::fs::create_dir_all(&trigger_dir).unwrap_or_else(|_| {});
+        
+        let focus_path = format!("{}/focus-window", trigger_dir);
+        if let Ok(file) = std::fs::File::create(&focus_path) {
+            drop(file); // Just create the file as a trigger
+            println!("Created focus trigger file for Wayland");
+        }
+        return;
     }
     
-    let _ = Command::new("chmod")
-        .args(["+x", &script_path])
-        .status();
+    // X11-specific methods - only run these on X11
+    // First try to get window ID
+    if let Ok(output) = Command::new("xdotool")
+        .args(["search", "--name", "^Instant Translator$"])
+        .output()
+    {
+        if let Ok(window_id) = String::from_utf8(output.stdout) {
+            if !window_id.is_empty() {
+                // Unmap and map the window to force it to top
+                let _ = Command::new("xdotool")
+                    .args(["windowunmap", &window_id])
+                    .status();
+                
+                let _ = Command::new("xdotool")
+                    .args(["windowmap", &window_id])
+                    .status();
+                
+                // Now focus it
+                let _ = Command::new("xdotool")
+                    .args([
+                        "windowactivate",
+                        "--sync",
+                        &window_id,
+                        "windowraise",
+                        "windowfocus",
+                        "mousemove", "--window", &window_id, "0", "0"
+                    ])
+                    .status();
+                
+                return; // Window focused successfully
+            }
+        }
+    }
     
-    let _ = Command::new("sh")
-        .arg(&script_path)
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
+    // Fallback methods if window ID approach failed
+    let methods = vec![
+        // Method 1: Use wmctrl to force window above others
+        Command::new("wmctrl")
+            .args(["-F", "-a", WINDOW_TITLE])
+            .spawn(),
+            
+        // Method 2: Use wmctrl to force window state
+        Command::new("wmctrl")
+            .args(["-F", "-a", WINDOW_TITLE, "-b", "remove,hidden,shaded", "-b", "add,above,sticky"])
+            .spawn(),
+            
+        // Method 3: Try by window class
+        Command::new("xdotool")
+            .args(["search", "--class", "translator-app", "windowactivate", "--sync", "windowraise", "windowfocus"])
+            .spawn()
+    ];
+    
+    // Wait for all methods to complete
+    for mut child in methods.into_iter().filter_map(Result::ok) {
+        let _ = child.wait();
+    }
+    
+    // Final attempt with both tools
+    let _ = Command::new("wmctrl")
+        .args(["-F", "-a", WINDOW_TITLE, "-b", "remove,hidden,shaded", "-b", "add,above,sticky"])
+        .status();
+        
+    let _ = Command::new("xdotool")
+        .args(["search", "--name", WINDOW_TITLE, "windowactivate", "--sync", "windowraise", "windowfocus"])
         .status();
 }
 
@@ -333,13 +383,11 @@ fn monitor_x11_hotkey(trigger_path: &str) {
                             let _ = file.write_all(selection.as_bytes());
                         }
                         
-                        // Create a file to signal the app should come to the foreground
-                        let focus_path = format!("{}/.config/translator-app/focus-window", home_dir);
-                        if let Ok(file) = File::create(&focus_path) {
-                            drop(file);
-                        }
+                        // Focus the window immediately and aggressively
+                        focus_translator_window();
                         
-                        // Try to focus the translator window
+                        // Add a small delay and try again to ensure focus
+                        thread::sleep(Duration::from_millis(100));
                         focus_translator_window();
                     }
                 }
@@ -350,29 +398,5 @@ fn monitor_x11_hotkey(trigger_path: &str) {
 
 /// Get the current selection using the appropriate method
 fn get_current_selection() -> String {
-    // Try X11 selection method first
-    if let Ok(output) = Command::new("xclip").args(["-o", "-selection", "primary"]).output() {
-        if output.status.success() {
-            return String::from_utf8_lossy(&output.stdout).to_string();
-        }
-    }
-    
-    // Try Wayland selection method
-    if let Ok(output) = Command::new("wl-paste").arg("--primary").output() {
-        if output.status.success() {
-            return String::from_utf8_lossy(&output.stdout).to_string();
-        }
-    }
-    
-    // Fallback - try again with X environment variable unset (for XWayland)
-    if let Ok(output) = Command::new("sh")
-        .arg("-c")
-        .arg("WAYLAND_DISPLAY= xclip -o -selection primary")
-        .output() {
-        if output.status.success() {
-            return String::from_utf8_lossy(&output.stdout).to_string();
-        }
-    }
-    
-    String::new()
+    crate::selection::get_selected_text()
 }
